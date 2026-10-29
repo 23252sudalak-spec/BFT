@@ -107,4 +107,6 @@ export interface SheetsConfig {
   isConnected: boolean;
   lastSyncTime: string | null;
   lineNotifyToken?: string;
+  appsScriptWebhookUrl?: string;
+  sheetUrl?: string;
 }

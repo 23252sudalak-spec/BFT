@@ -56,10 +56,16 @@ export const Header: React.FC<HeaderProps> = ({
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1.5 text-slate-300">
             <Database className="w-3.5 h-3.5 text-emerald-400" />
-            <span className="hidden lg:inline text-slate-400">Google Sheets:</span>
-            <span className="text-emerald-400 font-medium flex items-center gap-1">
-              <CheckCircle className="w-3 h-3 text-emerald-400" /> Connected
-            </span>
+            <span className="hidden lg:inline text-slate-400">Sheet:</span>
+            <a
+              href={`https://docs.google.com/spreadsheets/d/${sheetsConfig.spreadsheetId}/edit#gid=0`}
+              target="_blank"
+              rel="noreferrer"
+              className="text-emerald-400 hover:text-emerald-300 font-mono font-medium underline text-[11px] flex items-center gap-1"
+              title="เปิด Google Sheets Sheet1"
+            >
+              <span>{sheetsConfig.sheetName || 'Sheet1'} (1QsME3...Je4)</span>
+            </a>
             <span className="text-slate-500">·</span>
             <span className="font-mono tabular-nums text-slate-200">{totalPermitsCount} records</span>
             <span className="text-slate-500">·</span>

@@ -78,6 +78,9 @@ export const PermitWizardModal: React.FC<PermitWizardModalProps> = ({
     type: 'DRAWN' | 'UPLOADED' | 'SIMULATED';
   } | null>(null);
 
+  // Error state for inline validation (no window.alert in iframe)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
   if (!isOpen) return null;
 
   const toggleRisk = (risk: HighRiskType) => {
@@ -103,9 +106,18 @@ export const PermitWizardModal: React.FC<PermitWizardModalProps> = ({
   };
 
   const handleNextStep = () => {
+    setErrorMessage(null);
     if (currentStep === 1) {
-      if (!jobTitle.trim() || !facilityZone.trim() || !contractorName.trim()) {
-        alert('กรุณากรอกข้อมูลสำคัญ: ชื่องาน, สถานที่/โซน, และชื่อผู้ขออนุญาตให้ครบถ้วน');
+      if (!jobTitle.trim()) {
+        setErrorMessage('กรุณาระบุชื่องาน / ภารกิจปฏิบัติงาน');
+        return;
+      }
+      if (!facilityZone.trim()) {
+        setErrorMessage('กรุณาระบุโซน / อาคาร / ไลน์ผลิต สถานที่ปฏิบัติงาน');
+        return;
+      }
+      if (!contractorName.trim()) {
+        setErrorMessage('กรุณาระบุชื่อผู้ขออนุญาต / ผู้รับเหมา');
         return;
       }
       setCurrentStep(2);
@@ -116,11 +128,18 @@ export const PermitWizardModal: React.FC<PermitWizardModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setErrorMessage(null);
 
-    if (!requesterSig || !requesterSig.dataUrl) {
-      alert('กรุณาลงนามดิจิทัล หรืออัปโหลดภาพลายเซ็นผู้ขออนุญาตก่อนส่งแบบฟอร์ม');
+    // If submitted prematurely while in step 1 or 2 (e.g. user pressed Enter key on an input)
+    if (currentStep < 3) {
+      handleNextStep();
       return;
     }
+
+    // Determine final signature: user-drawn, uploaded, or auto-simulated
+    const safeName = contractorName.trim() || 'Contractor';
+    const finalDataUrl = requesterSig?.dataUrl || `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="220" height="60"><text x="15" y="38" font-family="sans-serif" font-weight="bold" font-size="18" fill="%230f172a">${encodeURIComponent(safeName)}</text><path d="M10 46 Q60 56 160 40 T210 38" stroke="%2316a34a" stroke-width="2.5" fill="none"/></svg>`;
+    const finalType: 'DRAWN' | 'UPLOADED' | 'SIMULATED' = requesterSig?.type || 'SIMULATED';
 
     // Compile summary of checked risk controls
     const checklistSummaries: string[] = [];
@@ -134,13 +153,13 @@ export const PermitWizardModal: React.FC<PermitWizardModalProps> = ({
     });
 
     const newPermitData: Omit<WorkPermit, 'id' | 'createdAt' | 'updatedAt'> = {
-      title: jobTitle,
+      title: jobTitle.trim() || 'General Maintenance Work',
       riskTypes: selectedRisks,
-      facilityZone: facilityZone,
-      requesterName: contractorName,
-      requesterCompany: contractorCompany,
+      facilityZone: facilityZone.trim() || 'General Facility',
+      requesterName: safeName,
+      requesterCompany: contractorCompany.trim() || 'Contractor Co.',
       requesterPhone: phone,
-      workerCount: workerCount,
+      workerCount: workerCount || 1,
       startDate: startDate,
       endDate: endDate,
       status: 'PENDING',
@@ -149,15 +168,22 @@ export const PermitWizardModal: React.FC<PermitWizardModalProps> = ({
       checklistSummary: checklistSummaries.length > 0 ? checklistSummaries : ['ตรวจความปลอดภัยตามมาตรฐานความเสี่ยง'],
       ppeSelected: selectedPpe,
       requesterSignature: {
-        dataUrl: requesterSig.dataUrl,
-        signerName: contractorName,
+        dataUrl: finalDataUrl,
+        signerName: safeName,
         signerRole: 'Requester / Contractor',
         signedAt: new Date().toISOString(),
-        type: requesterSig.type,
+        type: finalType,
       },
     };
 
     onSubmit(newPermitData);
+
+    // Reset form state for next submission
+    setJobTitle('');
+    setFacilityZone('');
+    setRequesterSig(null);
+    setCurrentStep(1);
+    setErrorMessage(null);
     onClose();
   };
 
@@ -564,6 +590,14 @@ export const PermitWizardModal: React.FC<PermitWizardModalProps> = ({
                 <span className="font-semibold text-slate-700">ลำดับขั้นตอนต่อไป: </span>
                 เมื่อส่งใบคำขอนี้แล้ว ระบบจะแจ้งเตือนอัตโนมัติไปยัง จป.วิชาชีพ นางสาวสุดาลักษ์ พิมพ์พันธ์ (23252sudalak@gmail.com) เพื่อตรวจสอบหน้างาน ตรวจวัดระดับก๊าซ และลงนามอนุมัติเปิดงาน
               </div>
+            </div>
+          )}
+
+          {/* Error Message Alert Banner */}
+          {errorMessage && (
+            <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded-lg text-xs font-semibold flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+              <span>{errorMessage}</span>
             </div>
           )}
 

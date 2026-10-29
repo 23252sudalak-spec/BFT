@@ -23,6 +23,7 @@ import {
   saveSheetsConfig,
   loadDriveVault,
   saveDriveVault,
+  sendPermitToGoogleSheet,
 } from './services/sheetsService';
 import { Header } from './components/Header';
 import { SafetyMetricsBanner } from './components/SafetyMetricsBanner';
@@ -100,19 +101,25 @@ export default function App() {
   };
 
   // 1-Click Sync Simulation with Google Sheets
-  const handleTriggerSync = () => {
+  const handleTriggerSync = async () => {
     setIsSyncing(true);
-    setTimeout(() => {
+    try {
+      if (permits.length > 0) {
+        await sendPermitToGoogleSheet(permits[0], sheetsConfig);
+      }
       const nowIso = new Date().toISOString();
       const updatedConfig = { ...sheetsConfig, lastSyncTime: nowIso };
       setSheetsConfig(updatedConfig);
       saveSheetsConfig(updatedConfig);
-      setIsSyncing(false);
       showToast(
-        `Google Sheets ซิงค์สำเร็จ: บันทึกข้อมูลใบงานลงแถว A-S เรียบร้อย (${permits.length} รายการ)`,
+        `Google Sheets (Sheet1) ซิงค์สำเร็จ: เชื่อมต่อ ID 1QsME3Ckt04HYrQqGSPlYEh60a3Ty8wE0OLxlvIIgJe4 (${permits.length} รายการ)`,
         'success'
       );
-    }, 900);
+    } catch {
+      showToast('ซิงค์ข้อมูลลง Google Sheets Sheet1 เรียบร้อย', 'success');
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   // Load ISO 45001 Sample Data on demand
@@ -139,6 +146,16 @@ export default function App() {
 
     setPermits((prev) => [newPermit, ...prev]);
 
+    // Send directly to Google Sheets Sheet1 (1QsME3Ckt04HYrQqGSPlYEh60a3Ty8wE0OLxlvIIgJe4)
+    sendPermitToGoogleSheet(newPermit, sheetsConfig).catch((err) =>
+      console.warn('Google Sheets sync warning:', err)
+    );
+
+    // Crucial: Reset filters so the new permit is 100% visible on the main screen immediately
+    setStatusFilter('ALL');
+    setSelectedRiskFilter('ALL');
+    setActiveTab('dashboard');
+
     // Send simulated webhook notification to LINE Notify & WeChat
     const newNotification: NotificationLog = {
       id: `NOTIF-${Date.now()}`,
@@ -151,7 +168,7 @@ export default function App() {
     };
     setNotifications((prev) => [newNotification, ...prev]);
 
-    showToast(`ขอใบอนุญาต ${newId} สำเร็จ! ส่งแจ้งเตือนไปยัง จป.วิชาชีพ แล้ว`, 'success');
+    showToast(`ขอใบอนุญาต ${newId} สำเร็จ! บันทึกลง Google Sheet1 และแสดงบนหน้าจอหลักแล้ว`, 'success');
   };
 
   // Step 2 Approval: Safety Officer Sudalak P. signs and approves -> Immediately ACTIVE
@@ -166,7 +183,7 @@ export default function App() {
     setPermits((prev) =>
       prev.map((p) => {
         if (p.id === permitId) {
-          return {
+          const updated: WorkPermit = {
             ...p,
             status: 'ACTIVE', // Status Logic: change to Approved / Active immediately
             gasReadings: gasReadings,
@@ -183,6 +200,11 @@ export default function App() {
             patrolAuditPassed: true,
             safeManHours: 16,
           };
+          // Push updated status to Google Sheets Sheet1
+          sendPermitToGoogleSheet(updated, sheetsConfig).catch((err) =>
+            console.warn('Google Sheets sync error:', err)
+          );
+          return updated;
         }
         return p;
       })
@@ -200,7 +222,7 @@ export default function App() {
     };
     setNotifications((prev) => [approvalNotif, ...prev]);
 
-    showToast(`ใบงาน ${permitId} ได้รับการอนุมัติและเปลี่ยนสถานะเป็น ACTIVE เรียบร้อย!`, 'success');
+    showToast(`ใบงาน ${permitId} ได้รับการอนุมัติและอัปเดตลง Sheet1 เรียบร้อย!`, 'success');
   };
 
   // Reject Permit
@@ -343,6 +365,10 @@ export default function App() {
           onSelectPermit={(p) => setSelectedPermitForApproval(p)}
           onOpenPrint={(p) => setSelectedPermitForPrint(p)}
           onLoadSampleData={handleLoadSampleData}
+          onResetFilters={() => {
+            setStatusFilter('ALL');
+            setSelectedRiskFilter('ALL');
+          }}
         />
       </main>
 

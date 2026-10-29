@@ -2,5 +2,7 @@
   "name": "BANFERT e-PTW | ระบบใบอนุญาตทำงานปลอดภัยดิจิทัล",
   "description": "ระบบใบอนุญาตทำงานปลอดภัยดิจิทัล (Digital Work Permit System / e-PTW) แบบไร้กระดาษ มาตรฐาน ISO 45001, ISO 18001, ISO 9001, IATF 16949 พร้อมระบบลงนามดิจิทัล ซิงค์ Google Sheets/Drive และรองรับ 4 ภาษา (TH, ZH, EN, MY)",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }

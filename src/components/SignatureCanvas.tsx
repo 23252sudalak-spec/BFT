@@ -32,11 +32,13 @@ export const SignatureCanvas: React.FC<SignatureCanvasProps> = ({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Set high DPI display support
+    // Set high DPI display support with solid dimension fallbacks
     const rect = canvas.getBoundingClientRect();
     const dpr = window.devicePixelRatio || 1;
-    canvas.width = rect.width * dpr;
-    canvas.height = rect.height * dpr;
+    const w = rect.width > 0 ? rect.width : (canvas.parentElement?.clientWidth || 540);
+    const h = rect.height > 0 ? rect.height : 144;
+    canvas.width = w * dpr;
+    canvas.height = h * dpr;
     ctx.scale(dpr, dpr);
 
     ctx.lineCap = 'round';

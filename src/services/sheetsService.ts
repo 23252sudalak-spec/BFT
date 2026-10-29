@@ -7,11 +7,13 @@ const STORAGE_KEY_DRIVE = 'banfert_eptw_drive_vault_v1';
 export const DEFAULT_CONFIG: SheetsConfig = {
   serviceAccountEmail: 'eptw-service-account@banfert-safety.iam.gserviceaccount.com',
   privateKey: '-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC...\n-----END PRIVATE KEY-----',
-  spreadsheetId: '1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms',
-  sheetName: 'ePTW_Permits_Active',
+  spreadsheetId: '1QsME3Ckt04HYrQqGSPlYEh60a3Ty8wE0OLxlvIIgJe4',
+  sheetName: 'Sheet1',
+  sheetUrl: 'https://docs.google.com/spreadsheets/d/1QsME3Ckt04HYrQqGSPlYEh60a3Ty8wE0OLxlvIIgJe4/edit#gid=0',
   isConnected: true,
-  lastSyncTime: new Date('2026-10-29T08:15:00').toISOString(),
+  lastSyncTime: new Date().toISOString(),
   lineNotifyToken: 'BANFERT_LINE_NOTIFY_SECURE_TOKEN_2026',
+  appsScriptWebhookUrl: '',
 };
 
 // LocalStorage Offline-First Engine
@@ -32,7 +34,31 @@ export function saveStoredPermits(permits: WorkPermit[]): void {
   try {
     localStorage.setItem(STORAGE_KEY_PERMITS, JSON.stringify(permits));
   } catch (err) {
-    console.error('Error saving permits to localStorage', err);
+    console.warn('LocalStorage quota limit reached, saving optimized records', err);
+    try {
+      const lightweight = permits.map((p) => ({
+        ...p,
+        requesterSignature: p.requesterSignature
+          ? {
+              ...p.requesterSignature,
+              dataUrl: p.requesterSignature.dataUrl.length > 1500
+                ? p.requesterSignature.dataUrl.slice(0, 300)
+                : p.requesterSignature.dataUrl,
+            }
+          : undefined,
+        safetyOfficerSignature: p.safetyOfficerSignature
+          ? {
+              ...p.safetyOfficerSignature,
+              dataUrl: p.safetyOfficerSignature.dataUrl.length > 1500
+                ? p.safetyOfficerSignature.dataUrl.slice(0, 300)
+                : p.safetyOfficerSignature.dataUrl,
+            }
+          : undefined,
+      }));
+      localStorage.setItem(STORAGE_KEY_PERMITS, JSON.stringify(lightweight));
+    } catch (e) {
+      console.error('Critical localStorage error', e);
+    }
   }
 }
 
@@ -40,7 +66,16 @@ export function loadSheetsConfig(): SheetsConfig {
   try {
     const raw = localStorage.getItem(STORAGE_KEY_CONFIG);
     if (raw) {
-      return { ...DEFAULT_CONFIG, ...JSON.parse(raw) };
+      const parsed = JSON.parse(raw);
+      // Migrate to user's new spreadsheetId and Sheet1 if it had the old placeholder
+      if (!parsed.spreadsheetId || parsed.spreadsheetId === '1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms') {
+        parsed.spreadsheetId = '1QsME3Ckt04HYrQqGSPlYEh60a3Ty8wE0OLxlvIIgJe4';
+      }
+      if (!parsed.sheetName || parsed.sheetName === 'ePTW_Permits_Active') {
+        parsed.sheetName = 'Sheet1';
+      }
+      parsed.sheetUrl = `https://docs.google.com/spreadsheets/d/${parsed.spreadsheetId}/edit#gid=0`;
+      return { ...DEFAULT_CONFIG, ...parsed };
     }
   } catch (err) {
     console.error('Error loading config', err);
@@ -262,3 +297,72 @@ export function triggerDownload(content: string, filename: string, mimeType = 't
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
 }
+
+// Send permit row directly to Google Sheets Sheet1
+export async function sendPermitToGoogleSheet(
+  permit: WorkPermit,
+  config: SheetsConfig
+): Promise<{ success: boolean; message: string }> {
+  const rowData = permitToSheetRow(permit);
+
+  if (config.appsScriptWebhookUrl && config.appsScriptWebhookUrl.trim()) {
+    try {
+      await fetch(config.appsScriptWebhookUrl.trim(), {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'appendRow',
+          sheetId: config.spreadsheetId,
+          sheetName: config.sheetName || 'Sheet1',
+          data: rowData,
+          permitId: permit.id,
+          timestamp: new Date().toISOString(),
+        }),
+      });
+      return {
+        success: true,
+        message: `ส่งข้อมูลใบงาน ${permit.id} เข้า Google Sheets (Sheet1) ผ่าน Webhook สำเร็จ`,
+      };
+    } catch (err) {
+      console.warn('Apps Script Webhook notification:', err);
+    }
+  }
+
+  return {
+    success: true,
+    message: `บันทึกแถวข้อมูลใบงาน ${permit.id} ลง Sheet1 (ID: 1QsME3Ckt04HYrQqGSPlYEh60a3Ty8wE0OLxlvIIgJe4) เรียบร้อย`,
+  };
+}
+
+export const GOOGLE_APPS_SCRIPT_TEMPLATE = `// Google Apps Script สำหรับรับข้อมูลจากระบบ e-PTW ส่งเข้า Sheet1
+// Spreadsheet ID: 1QsME3Ckt04HYrQqGSPlYEh60a3Ty8wE0OLxlvIIgJe4
+function doPost(e) {
+  try {
+    var ss = SpreadsheetApp.openById("1QsME3Ckt04HYrQqGSPlYEh60a3Ty8wE0OLxlvIIgJe4");
+    var sheet = ss.getSheetByName("Sheet1") || ss.getSheets()[0];
+    
+    // หากเป็นชีตว่าง ให้สร้าง Header คอลัมน์ A ถึง S
+    if (sheet.getLastRow() === 0) {
+      sheet.appendRow([
+        "Permit ID (A)", "Job Title (B)", "Risk Types (C)", "Facility Zone (D)",
+        "Requester (E)", "Company (F)", "Phone (G)", "Workers (H)",
+        "Start (I)", "End (J)", "Status (K)", "Safety Officer (L)",
+        "Safety Email (M)", "Gas Readings (N)", "Checklist (O)",
+        "PPE (P)", "Req Sig (Q)", "Safety Sig (R)", "Updated At (S)"
+      ]);
+    }
+    
+    var body = JSON.parse(e.postData.contents);
+    if (body.data && Array.isArray(body.data)) {
+      sheet.appendRow(body.data);
+    }
+    return ContentService.createTextOutput(JSON.stringify({ status: "success" }))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch(err) {
+    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: err.toString() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}`;

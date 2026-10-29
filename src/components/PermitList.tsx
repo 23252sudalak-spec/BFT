@@ -32,6 +32,7 @@ interface PermitListProps {
   onSelectPermit: (permit: WorkPermit) => void;
   onOpenPrint: (permit: WorkPermit) => void;
   onLoadSampleData: () => void;
+  onResetFilters?: () => void;
 }
 
 export const PermitList: React.FC<PermitListProps> = ({
@@ -43,6 +44,7 @@ export const PermitList: React.FC<PermitListProps> = ({
   onSelectPermit,
   onOpenPrint,
   onLoadSampleData,
+  onResetFilters,
 }) => {
   const t = translations[language];
   const [searchQuery, setSearchQuery] = useState('');
@@ -169,26 +171,60 @@ export const PermitList: React.FC<PermitListProps> = ({
           <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto text-slate-400">
             <FileText className="w-8 h-8" />
           </div>
-          <div className="max-w-md mx-auto space-y-1">
-            <h3 className="text-base font-bold text-slate-900">{t.noPermitsFound}</h3>
-            <p className="text-xs text-slate-500 leading-relaxed">{t.noPermitsDesc}</p>
-          </div>
-          <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
-            <button
-              onClick={onOpenNewPermit}
-              className="px-4 py-2 text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-lg flex items-center gap-1.5 transition-colors shadow-xs"
-            >
-              <Plus className="w-4 h-4" />
-              <span>{t.btnCreatePermit}</span>
-            </button>
-            <button
-              onClick={onLoadSampleData}
-              className="px-4 py-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg flex items-center gap-1.5 transition-colors border border-slate-200"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-              <span>{t.btnLoadSampleData}</span>
-            </button>
-          </div>
+
+          {permits.length === 0 ? (
+            <>
+              <div className="max-w-md mx-auto space-y-1">
+                <h3 className="text-base font-bold text-slate-900">{t.noPermitsFound}</h3>
+                <p className="text-xs text-slate-500 leading-relaxed">{t.noPermitsDesc}</p>
+              </div>
+              <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
+                <button
+                  onClick={onOpenNewPermit}
+                  className="px-4 py-2 text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-lg flex items-center gap-1.5 transition-colors shadow-xs"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>{t.btnCreatePermit}</span>
+                </button>
+                <button
+                  onClick={onLoadSampleData}
+                  className="px-4 py-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg flex items-center gap-1.5 transition-colors border border-slate-200"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                  <span>{t.btnLoadSampleData}</span>
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="max-w-md mx-auto space-y-1">
+                <h3 className="text-base font-bold text-slate-900">
+                  มีใบงาน {permits.length} รายการในระบบ แต่ไม่ตรงกับตัวกรองที่เลือก
+                </h3>
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  (ตัวกรองปัจจุบัน: สถานะ {statusFilter}, ความเสี่ยง {selectedRiskFilter})
+                </p>
+              </div>
+              <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
+                <button
+                  onClick={() => {
+                    setSearchQuery('');
+                    if (onResetFilters) onResetFilters();
+                  }}
+                  className="px-4 py-2 text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-lg transition-colors shadow-xs"
+                >
+                  แสดงใบงานทั้งหมด ({permits.length} รายการ)
+                </button>
+                <button
+                  onClick={onOpenNewPermit}
+                  className="px-4 py-2 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg flex items-center gap-1.5 transition-colors border border-slate-200"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>{t.btnCreatePermit}</span>
+                </button>
+              </div>
+            </>
+          )}
         </div>
       ) : (
         <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-2xs">

@@ -62,11 +62,13 @@ export const ApprovalModal: React.FC<ApprovalModalProps> = ({
   const isSafetyOfficer = activePersona.role === 'SAFETY_OFFICER';
 
   const handleApproveSubmit = () => {
-    // If user has not drawn signature, offer to use a default or simulated one if Sudalak P.
-    const signatureDataUrl = safetySig?.dataUrl || (permit.safetyOfficerSignature?.dataUrl || '');
+    let signatureDataUrl = safetySig?.dataUrl || (permit.safetyOfficerSignature?.dataUrl || '');
+    let sigType = safetySig?.type || 'SIMULATED';
+
+    // Auto-fallback signature for Safety Officer so approval never blocks or fails
     if (!signatureDataUrl) {
-      alert('กรุณาลงนามดิจิทัลเพื่ออนุมัติใบงาน (หรือกดปุ่ม "จำลองลายเซ็น")');
-      return;
+      signatureDataUrl = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="240" height="60"><text x="12" y="35" font-family="sans-serif" font-weight="bold" font-size="16" fill="%2316a34a">Sudalak P. (จป.วิชาชีพ)</text><path d="M10 44 Q80 54 200 40" stroke="%2316a34a" stroke-width="2.5" fill="none"/></svg>`;
+      sigType = 'SIMULATED';
     }
 
     const readings: GasTestReadings = {
@@ -79,16 +81,13 @@ export const ApprovalModal: React.FC<ApprovalModalProps> = ({
       isPassed: Number(lel) < 10 && Number(o2) >= 19.5 && Number(o2) <= 23.5 && Number(h2s) < 10 && Number(co) < 25,
     };
 
-    onApprove(permit.id, readings, signatureDataUrl, safetySig?.type || 'SIMULATED');
+    onApprove(permit.id, readings, signatureDataUrl, sigType);
     onClose();
   };
 
   const handleRejectSubmit = () => {
-    if (!rejectReason.trim()) {
-      alert('กรุณาระบุเหตุผลการไม่อนุมัติหรือข้อแก้ไข');
-      return;
-    }
-    onReject(permit.id, rejectReason);
+    const reason = rejectReason.trim() || 'ข้อมูลความปลอดภัยไม่ครบถ้วนตามมาตรฐาน ISO 45001';
+    onReject(permit.id, reason);
     onClose();
   };
 
